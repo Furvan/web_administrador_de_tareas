@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Tareas y Usuarios</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="//cdn.datatables.net/2.1.8/css/dataTables.dataTables.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="//cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
+</head>
+</head>
+<body>
+    <nav>
+        <div class="navbar">
+            <span class="welcome">Bienvenido, {{ request.user.username }}</span>
+            <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Gestor de Tareas y Usuarios</h1>
+        
+        {% if request.user.is_superuser %}
+        <div class="table-section">
+            <h2>Usuarios Registrados</h2>
+            <button id="addUserBtn" class="action-btn">Agregar Usuario</button>
+            <table id="userTable" class="display">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Es Superusuario</th>
+                        <th>Última Conexión</th>
+                        <th>Opciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargarán dinámicamente con JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <hr class="table-separator">
+        {% endif %}
+
+        <div class="table-section">
+            <h2>Tareas</h2>
+            <button id="addTaskBtn" class="action-btn">Agregar Tarea</button>
+            <table id="taskTable" class="display">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Descripción</th>
+                        <th>Estado</th>
+                        {% if request.user.is_superuser %}
+                        <th>Usuario</th>
+                        <th>Es tarea de superusuario</th>
+                        <th>Visible para todos</th>
+                        {% endif %}
+                        <th>Opciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargarán dinámicamente con JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación de cierre de sesión -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content">
+            <h2>Confirmar cierre de sesión</h2>
+            <p>¿Estás seguro de que deseas cerrar sesión?</p>
+            <div class="modal-buttons">
+                <button id="confirmLogout">Sí, cerrar sesión</button>
+                <button id="cancelLogout">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar/editar usuario -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <h2 id="userModalTitle">Agregar Usuario</h2>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña:</label>
+                    <div class="password-container">
+                        <input type="password" id="password" required>
+                        <button type="button" id="togglePassword" class="toggle-password">👁️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="isSuperuser">Es Superusuario:</label>
+                    <input type="checkbox" id="isSuperuser">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit">Guardar</button>
+                    <button type="button" class="cancel-btn">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para agregar/editar tarea -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <h2 id="taskModalTitle">Agregar Tarea</h2>
+            <form id="taskForm">
+                <input type="hidden" id="taskId">
+                <div class="form-group">
+                    <label for="title">Título:</label>
+                    <input type="text" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Descripción:</label>
+                    <textarea id="description" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="state">Estado:</label>
+                    <select id="state">
+                        <option value="false">Pendiente</option>
+                        <option value="true">Completada</option>
+                    </select>
+                </div>
+                {% if request.user.is_superuser %}
+                <div class="form-group">
+                    <label for="taskUsers">Usuarios que pueden ver la tarea:</label>
+                    <select id="taskUsers" multiple class="form-control">
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="isSuperuserTask">Es tarea de superusuario:</label>
+                    <input type="checkbox" id="isSuperuserTask">
+                </div>
+                <div class="form-group">
+                    <label for="visibleToAll">Visible para todos:</label>
+                    <input type="checkbox" id="visibleToAll">
+                </div>
+                {% endif %}
+                <div class="modal-buttons">
+                    <button type="submit">Guardar</button>
+                    <button type="button" class="cancel-btn">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación de eliminación -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <h2>Confirmar eliminación</h2>
+            <p>¿Estás seguro de que deseas eliminar este elemento?</p>
+            <div class="modal-buttons">
+                <button id="confirmDelete">Sí, eliminar</button>
+                <button id="cancelDelete">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Configuración de AJAX para incluir el token CSRF en todas las solicitudes
+            $.ajaxSetup({
+                headers: { "X-CSRFToken": Cookies.get("csrftoken") }
+            });
+
+            let taskTable = new DataTable('#taskTable', {
+                ajax: {
+                    url: '/api/tasks/',
+                    dataSrc: ''
+                },
+                columns: [
+                    { data: 'title' },
+                    { data: 'description' },
+                    { data: 'state', render: function(data) {
+                        return data ? 'Completada' : 'Pendiente';
+                    }},
+                    {% if request.user.is_superuser %}
+                    { data: 'user' },
+                    { data: 'is_superuser_task' },
+                    { data: 'visible_to_all' },
+                    {% endif %}
+                    { 
+                        data: null,
+                        render: function(data, type, row) {
+                            let buttons = '<button class="edit-task-btn" data-id="' + row.id + '">Editar</button>';
+                            {% if request.user.is_superuser %}
+                            buttons += ' <button class="delete-task-btn" data-id="' + row.id + '">Borrar</button>';
+                            {% endif %}
+                            return buttons;
+                        }
+                    }
+                ]
+            });
+
+            {% if request.user.is_superuser %}
+            let userTable = new DataTable('#userTable', {
+                ajax: {
+                    url: '/api/users/',
+                    dataSrc: ''
+                },
+                columns: [
+                    { data: 'username' },
+                    { data: 'email' },
+                    { data: 'is_superuser' },
+                    { data: 'last_login', render: function(data) {
+                        return data ? new Date(data).toLocaleString() : 'Nunca';
+                    }},
+                    { 
+                        data: null,
+                        render: function(data, type, row) {
+                            return '<button class="edit-user-btn" data-id="' + row.id + '">Editar</button> ' +
+                                   '<button class="delete-user-btn" data-id="' + row.id + '">Borrar</button>';
+                        }
+                    }
+                ]
+            });
+            {% endif %}
+
+            // Lógica para el modal de cierre de sesión
+            const logoutModal = document.getElementById('logoutModal');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const confirmLogout = document.getElementById('confirmLogout');
+            const cancelLogout = document.getElementById('cancelLogout');
+
+            logoutBtn.onclick = function() {
+                logoutModal.style.display = "block";
+            }
+
+            cancelLogout.onclick = function() {
+                logoutModal.style.display = "none";
+            }
+
+            confirmLogout.onclick = function() {
+                window.location.href = "{% url 'logout' %}";
+            }
+
+            // Lógica para los modales de usuario y tarea
+            const userModal = document.getElementById('userModal');
+            const taskModal = document.getElementById('taskModal');
+            const deleteModal = document.getElementById('deleteModal');
+
+            $('#addUserBtn').click(function() {
+                $('#userModalTitle').text('Agregar Usuario');
+                $('#userForm')[0].reset();
+                $('#userId').val('');
+                userModal.style.display = "block";
+            });
+
+            $('#addTaskBtn').click(function() {
+                $('#taskModalTitle').text('Agregar Tarea');
+                $('#taskForm')[0].reset();
+                $('#taskId').val('');
+                taskModal.style.display = "block";
+            });
+
+            $('.cancel-btn').click(function() {
+                userModal.style.display = "none";
+                taskModal.style.display = "none";
+            });
+
+
+
+            $('#userForm').submit(function(e) {
+                e.preventDefault();
+                let userId = $('#userId').val();
+                let userData = {
+                    username: $('#username').val(),
+                    email: $('#email').val(),
+                    password: $('#password').val(),
+                    is_superuser: $('#isSuperuser').is(':checked')
+                };
+                let url = userId ? '/api/users/' + userId + '/' : '/api/users/';
+                let method = userId ? 'PUT' : 'POST';
+
+                $.ajax({
+                    url: url,
+                    type: method,
+                    data: JSON.stringify(userData),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        userModal.style.display = "none";
+                        userTable.ajax.reload();
+                    },
+                    error: function(error) {
+                        alert('Error al guardar el usuario: ' + error.responseJSON.error);
+                    }
+                });
+            });
+
+            // Cargar usuarios para el select de tareas (solo para superusuarios)
+            {% if request.user.is_superuser %}
+            $.get('/api/users/', function(users) {
+                let options = users.map(user => `<option value="${user.id}">${user.username}</option>`);
+                $('#taskUsers').html(options.join(''));
+            });
+            {% endif %}
+
+            $('#taskForm').submit(function(e) {
+                e.preventDefault();
+                let taskId = $('#taskId').val();
+                let taskData = {
+                    title: $('#title').val(),
+                    description: $('#description').val(),
+                    state: $('#state').val() === 'true',
+                    {% if request.user.is_superuser %}
+                    is_superuser_task: $('#isSuperuserTask').is(':checked'),
+                    visible_to_all: $('#visibleToAll').is(':checked'),
+                    visible_to: $('#taskUsers').val() || []
+                    {% endif %}
+                };
+
+                let url = taskId ? '/api/tasks/' + taskId + '/' : '/api/tasks/';
+                let method = taskId ? 'PUT' : 'POST';
+
+                $.ajax({
+                    url: url,
+                    type: method,
+                    data: JSON.stringify(taskData),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        taskModal.style.display = "none";
+                        taskTable.ajax.reload();
+                    },
+                    error: function(error) {
+                        alert('Error al guardar la tarea: ' + error.responseJSON.error);
+                    }
+                });
+            });
+
+            // Cargar usuarios para el select de tareas (solo para superusuarios)
+            {% if request.user.is_superuser %}
+            $.get('/api/users/', function(users) {
+                let options = users.map(user => `<option value="${user.id}">${user.username}</option>`);
+                $('#taskUsers').html(options.join(''));
+            });
+            {% endif %}
+
+            // Función para mostrar/ocultar la contraseña
+            $('#togglePassword').click(function() {
+                const passwordInput = $('#password');
+                const type = passwordInput.attr('type') === 'password' ? 'text' : 'password';
+                passwordInput.attr('type', type);
+                $(this).text(type === 'password' ? '👁️' : '🔒');
+            });
+
+            // Modificar la función de edición de usuario
+            $('#userTable').on('click', '.edit-user-btn', function() {
+                let userId = $(this).data('id');
+                $.get('/api/users/' + userId + '/get_user_data/', function(userData) {
+                    $('#userModalTitle').text('Editar Usuario');
+                    $('#userId').val(userData.id);
+                    $('#username').val(userData.username);
+                    $('#email').val(userData.email);
+                    $('#password').val('');
+                    $('#isSuperuser').prop('checked', userData.is_superuser);
+                    userModal.style.display = "block";
+                });
+            });
+
+            // Modificar la función de envío del formulario de usuario
+            $('#userForm').submit(function(e) {
+                e.preventDefault();
+                let userId = $('#userId').val();
+                let userData = {
+                    username: $('#username').val(),
+                    email: $('#email').val(),
+                    is_superuser: $('#isSuperuser').is(':checked')
+                };
+                
+
+                if ($('#password').val()) {
+                    userData.password = $('#password').val();
+                }
+
+                let url = userId ? '/api/users/' + userId + '/' : '/api/users/';
+                let method = userId ? 'PUT' : 'POST';
+
+                $.ajax({
+                    url: url,
+                    type: method,
+                    data: JSON.stringify(userData),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        userModal.style.display = "none";
+                        userTable.ajax.reload();
+                    },
+                    error: function(error) {
+                        alert('Error al guardar el usuario: ' + error.responseJSON.error);
+                    }
+                });
+            });
+
+
+            // Modificar la función de edición de tareas
+            $('#taskTable').on('click', '.edit-task-btn', function() {
+                let taskId = $(this).data('id');
+                $.get('/api/tasks/' + taskId + '/', function(taskData) {
+                    $('#taskModalTitle').text('Editar Tarea');
+                    $('#taskId').val(taskData.id);
+                    $('#title').val(taskData.title);
+                    $('#description').val(taskData.description);
+                    $('#state').val(taskData.state.toString());
+                    {% if request.user.is_superuser %}
+                    $('#isSuperuserTask').prop('checked', taskData.is_superuser_task);
+                    $('#visibleToAll').prop('checked', taskData.visible_to_all);
+                    $('#taskUsers').val(taskData.visible_to);
+                    {% endif %}
+                    taskModal.style.display = "block";
+                });
+            });
+
+            // Lógica para eliminar usuarios y tareas
+            function showDeleteModal(id, type) {
+                $('#deleteModal').data('id', id).data('type', type);
+                deleteModal.style.display = "block";
+            }
+
+            $('#userTable').on('click', '.delete-user-btn', function() {
+                showDeleteModal($(this).data('id'), 'user');
+            });
+
+            $('#taskTable').on('click', '.delete-task-btn', function() {
+                showDeleteModal($(this).data('id'), 'task');
+            });
+
+            $('#confirmDelete').click(function() {
+                let id = $('#deleteModal').data('id');
+                let type = $('#deleteModal').data('type');
+                let url = type === 'user' ? '/api/users/' + id + '/' : '/api/tasks/' + id + '/';
+
+                $.ajax({
+                    url: url,
+                    type: 'DELETE',
+                    success: function() 
+                    {
+                        deleteModal.style.display = "none";
+                        if (type === 'user') {
+                            userTable.ajax.reload();
+                        } else {
+                            taskTable.ajax.reload();
+                        }
+                    },
+                    error: function() {
+                        alert('Error al eliminar el elemento');
+                    }
+                });
+            });
+
+            $('#cancelDelete').click(function() {
+                deleteModal.style.display = "none";
+            });
+
+            // Cerrar modales al hacer clic fuera de ellos
+            window.onclick = function(event) {
+                if (event.target == logoutModal || event.target == userModal || event.target == taskModal || event.target == deleteModal) {
+                    logoutModal.style.display = "none";
+                    userModal.style.display = "none";
+                    taskModal.style.display = "none";
+                    deleteModal.style.display = "none";
+                }
+            }
+
+            // Cargar usuarios para el select de tareas (solo para superusuarios)
+            {% if request.user.is_superuser %}
+            $.get('/api/users/', function(users) {
+                let options = users.map(user => `<option value="${user.id}">${user.username}</option>`);
+                $('#taskUser').html(options.join(''));
+            });
+            {% endif %}
+        });
+    </script>
+</body>
+</html>
